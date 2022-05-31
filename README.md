@@ -1,5 +1,14 @@
 # PlayerTrade
-A PocketMine-MP plugin that implements trade like PC server!
+![Fork Logo](https://media.discordapp.net/attachments/973097510748966982/981141129560981504/PlayerTrade.gif?width=1416&height=503)
+A PocketMine-MP plugin that implements trade like PC server! 
+
+**Forked by MagicGames. Updated to PM4 and patched exploits. Will be supported as long as MagicGames is alive :)**
+
+## Fork Changes
+- Updated to PM4 ([@cosmicnebula200](https://github.com/cosmicnebula200/))
+- Added a double confirmation system
+- Fixed item duplication on complete (Plugins-PocketMineMP/PlayerTrade#2 & Plugins-PocketMineMP/PlayerTrade#3)
+- Fixed rare occurrence of items not taken away from sender on complete
 
 # Features
 * User-modifiable message
@@ -21,7 +30,7 @@ public function onTradeStart(\alvin0319\PlayerTrade\event\TradeStartEvent $event
     $sender = $event->getSender();
     $receiver = $event->getReceiver();
     if(some condition...){
-        $event->setCancelled(true);
+        $event->cancel();
     }
 }
 ```
