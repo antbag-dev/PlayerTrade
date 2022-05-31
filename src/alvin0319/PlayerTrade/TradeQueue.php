@@ -56,7 +56,7 @@ final class TradeQueue
 		$this->senderMenu->setInventoryCloseListener(Closure::fromCallable([$this, "onInventoryClose"]));
 		$this->receiverMenu->setInventoryCloseListener(Closure::fromCallable([$this, "onInventoryClose"]));
 
-		$borderItem = ItemFactory::getInstance()->get(1081, 0, 1);
+		$borderItem = ItemFactory::getInstance()->get(20, 0, 1);
 		$borderItem->setCustomName("§l ");
 
 		$redItem = ItemFactory::getInstance()->get(ItemIds::TERRACOTTA, 14);
