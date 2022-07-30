@@ -1,0 +1,10 @@
+{
+    "name": "magicgames-network/playertrade",
+    "type": "library",
+    "description": "",
+    "require-dev": {
+      "pocketmine/pocketmine-mp": "4.*",
+      "phpstan/phpstan": "^1.8.2",
+      "dzolnowski/invmenu": "4.0.x-dev"
+    }
+  }

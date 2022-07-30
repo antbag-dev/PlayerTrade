@@ -14,12 +14,12 @@ final class TradeEndEvent extends TradeEvent
 	public const REASON_SENDER_CANCEL = 3;
 	public const REASON_RECEIVER_CANCEL = 4;
 
-	protected int $reason = self::REASON_SUCCESS;
-
-	public function __construct(Player $sender, Player $receiver, int $reason = self::REASON_SUCCESS)
-	{
+	public function __construct(
+		Player $sender,
+		Player $receiver,
+		protected int $reason = self::REASON_SUCCESS
+	) {
 		parent::__construct($sender, $receiver);
-		$this->reason = $reason;
 	}
 
 	public function getReason(): int

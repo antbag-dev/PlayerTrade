@@ -35,26 +35,24 @@ final class PlayerTrade extends PluginBase implements Listener
 
 	public function onEnable(): void
 	{
-		if (!InvMenuHandler::isRegistered()) InvMenuHandler::register($this);
+		self::$prefix = $this->getConfig()->get("prefix", "§b§l[PlayerTrade] §r§7");
+		if (!InvMenuHandler::isRegistered()) {
+			InvMenuHandler::register($this);
+		}
+
 		$this->getServer()->getPluginManager()->registerEvents($this, $this);
-
 		$this->getScheduler()->scheduleRepeatingTask(new TradeCheckTask(), 20);
-
 		$this->getServer()->getCommandMap()->register("playertrade", new TradeCommand());
-
 		$this->saveDefaultConfig();
-
+		
 		if (!file_exists($this->getDataFolder() . "lang/" . $this->getConfig()->get("lang", "eng") . ".ini") && $this->saveResource("lang/{$this->getConfig()->get("lang", "eng")}.ini")) {
 			$this->getLogger()->alert("Language file not found... use english as default...");
 			$this->getConfig()->set("lang", "eng");
 		}
 
-		$this->saveResource($path = "lang/" . $this->getConfig()->get("lang", "eng"));
+		$this->saveResource("lang/" . $this->getConfig()->get("lang", "eng"));
 
 		$this->lang = new BaseLang($this->getConfig()->get("lang", "eng"), $this->getDataFolder() . "lang/");
-
-		self::$prefix = $this->getConfig()->get("prefix", "§b§l[PlayerTrade] §r§7");
-
 		$this->expireTime = (int) $this->getConfig()->get("requestExpire", 15);
 	}
 

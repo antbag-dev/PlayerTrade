@@ -31,29 +31,28 @@ final class TradeQueue
 	];
 
 	public const SENDER_DONE_SLOT = 45;
-
 	public const RECEIVER_DONE_SLOT = 53;
 
-	protected Player $sender, $receiver;
 	protected InvMenu $senderMenu, $receiverMenu;
-	
+
 	protected bool $isSenderDone = false, $isReceiverDone = false;
 	protected bool $isSenderConfirmed = false, $isReceiverConfirmed = false;
 	protected bool $done = false;
 
 	protected ?TaskHandler $handler = null;
 
-	public function __construct(Player $sender, Player $receiver)
-	{
-		$this->sender = $sender;
-		$this->receiver = $receiver;
+	public function __construct(
+		protected Player $sender,
+		protected Player $receiver
+	) {
 		$this->senderMenu = InvMenu::create(InvMenu::TYPE_DOUBLE_CHEST);
 		$this->senderMenu->setName("You      |     {$receiver->getName()}");
 		$this->senderMenu->setListener(Closure::fromCallable([$this, "handleInventoryTransaction"]));
+		$this->senderMenu->setInventoryCloseListener(Closure::fromCallable([$this, "onInventoryClose"]));
+
 		$this->receiverMenu = InvMenu::create(InvMenu::TYPE_DOUBLE_CHEST);
 		$this->receiverMenu->setName("{$sender->getName()}   |     You");
 		$this->receiverMenu->setListener(Closure::fromCallable([$this, "handleInventoryTransaction"]));
-		$this->senderMenu->setInventoryCloseListener(Closure::fromCallable([$this, "onInventoryClose"]));
 		$this->receiverMenu->setInventoryCloseListener(Closure::fromCallable([$this, "onInventoryClose"]));
 
 		$borderItem = ItemFactory::getInstance()->get(20, 0, 1);
@@ -68,6 +67,7 @@ final class TradeQueue
 
 		$this->senderMenu->getInventory()->setItem(self::SENDER_DONE_SLOT, $redItem);
 		$this->senderMenu->getInventory()->setItem(self::RECEIVER_DONE_SLOT, $redItem);
+		
 		$this->receiverMenu->getInventory()->setItem(self::SENDER_DONE_SLOT, $redItem);
 		$this->receiverMenu->getInventory()->setItem(self::RECEIVER_DONE_SLOT, $redItem);
 
@@ -213,11 +213,10 @@ final class TradeQueue
 			if ($this->isSenderDone || $this->isSenderConfirmed) {
 				return $discard;
 			}
-			
+
 			if (!in_array($slot, array_merge(self::SENDER_SLOTS, [self::SENDER_DONE_SLOT]))) {
 				return $discard;
 			}
-			
 		} else {
 			if ($slot === self::RECEIVER_DONE_SLOT) {
 				if ($this->isReceiverDone) {
@@ -232,11 +231,10 @@ final class TradeQueue
 			if ($this->isReceiverDone || $this->isReceiverConfirmed) {
 				return $discard;
 			}
-			
+
 			if (!in_array($slot, array_merge(self::RECEIVER_SLOTS, [self::RECEIVER_DONE_SLOT]))) {
 				return $discard;
 			}
-			
 		}
 		return $continue;
 	}

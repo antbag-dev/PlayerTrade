@@ -9,11 +9,9 @@ use alvin0319\PlayerTrade\TradeQueue;
 
 final class TradeQueueCheckTask extends Task
 {
-	protected TradeQueue $queue;
-
-	public function __construct(TradeQueue $queue)
-	{
-		$this->queue = $queue;
+	public function __construct(
+		protected TradeQueue $queue
+	) {
 	}
 
 	public function onRun(): void
