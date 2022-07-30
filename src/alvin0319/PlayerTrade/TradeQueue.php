@@ -35,6 +35,7 @@ final class TradeQueue
 
 	protected InvMenu $senderMenu, $receiverMenu;
 
+	protected bool $isSenderSynced = true, $isReceiverSynced = true;
 	protected bool $isSenderDone = false, $isReceiverDone = false;
 	protected bool $isSenderConfirmed = false, $isReceiverConfirmed = false;
 	protected bool $done = false;
@@ -67,7 +68,7 @@ final class TradeQueue
 
 		$this->senderMenu->getInventory()->setItem(self::SENDER_DONE_SLOT, $redItem);
 		$this->senderMenu->getInventory()->setItem(self::RECEIVER_DONE_SLOT, $redItem);
-		
+
 		$this->receiverMenu->getInventory()->setItem(self::SENDER_DONE_SLOT, $redItem);
 		$this->receiverMenu->getInventory()->setItem(self::RECEIVER_DONE_SLOT, $redItem);
 
@@ -125,13 +126,15 @@ final class TradeQueue
 		}
 		if (count($senderRemains) > 0) {
 			$this->sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("trade.inventoryFull"));
-			foreach ($senderRemains as $remain)
+			foreach ($senderRemains as $remain) {
 				$this->sender->dropItem($remain);
+			}
 		}
 		if (count($receiverRemains) > 0) {
 			$this->receiver->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("trade.inventoryFull"));
-			foreach ($receiverRemains as $remain)
+			foreach ($receiverRemains as $remain) {
 				$this->receiver->dropItem($remain);
+			}
 		}
 		$this->sender->removeCurrentWindow();
 		$this->receiver->removeCurrentWindow();
@@ -158,6 +161,7 @@ final class TradeQueue
 				$this->receiver->getInventory()->addItem($item);
 			}
 		}
+
 		if ($offline) {
 			if ($causedBySender) {
 				$this->receiverMenu->onClose($this->receiver);
@@ -194,47 +198,74 @@ final class TradeQueue
 
 	public function handleInventoryTransaction(InvMenuTransaction $action): InvMenuTransactionResult
 	{
+		$player = $action->getPlayer();
+		if ($this->isSender($player) && $this->isSenderSynced) {
+			$this->isSenderSynced = false;
+			return $this->handleSenderTransaction($action);
+		} elseif ($this->isReceiver($player) && $this->isReceiverSynced) {
+			$this->isReceiverSynced = false;
+			return $this->handleReceiverTransaction($action);
+		} else {
+			return $action->discard()->then(fn (Player $player) => $this->syncWith());
+		}
+	}
+
+	public function handleSenderTransaction(InvMenuTransaction $action): InvMenuTransactionResult
+	{
 		$discard = $action->discard()->then(fn (Player $player) => $this->syncWith());
 		$continue = $action->continue()->then(fn (Player $player) => $this->syncWith());
-		$player = $action->getPlayer();
+
 		$slot = $action->getAction()->getSlot();
-		if ($this->done) return $discard;
-		if ($this->isSender($player)) {
-			if ($slot === self::SENDER_DONE_SLOT) {
-				if ($this->isSenderDone) {
-					if (!$this->isSenderConfirmed && $this->isReceiverDone) {
-						$this->isSenderConfirmed = true;
-					}
-					return $discard;
-				}
-				$this->isSenderDone = true;
-				return $discard;
-			}
-			if ($this->isSenderDone || $this->isSenderConfirmed) {
-				return $discard;
-			}
+		if ($this->done) {
+			return $discard;
+		}
 
-			if (!in_array($slot, array_merge(self::SENDER_SLOTS, [self::SENDER_DONE_SLOT]))) {
-				return $discard;
-			}
-		} else {
-			if ($slot === self::RECEIVER_DONE_SLOT) {
-				if ($this->isReceiverDone) {
-					if (!$this->isReceiverConfirmed && $this->isSenderDone) {
-						$this->isReceiverConfirmed = true;
-					}
-					return $discard;
+		if ($slot === self::SENDER_DONE_SLOT) {
+			if ($this->isSenderDone) {
+				if (!$this->isSenderConfirmed && $this->isReceiverDone) {
+					$this->isSenderConfirmed = true;
 				}
-				$this->isReceiverDone = true;
 				return $discard;
 			}
-			if ($this->isReceiverDone || $this->isReceiverConfirmed) {
-				return $discard;
-			}
+			$this->isSenderDone = true;
+			return $discard;
+		}
+		if ($this->isSenderDone || $this->isSenderConfirmed) {
+			return $discard;
+		}
 
-			if (!in_array($slot, array_merge(self::RECEIVER_SLOTS, [self::RECEIVER_DONE_SLOT]))) {
+		if (!in_array($slot, array_merge(self::SENDER_SLOTS, [self::SENDER_DONE_SLOT]))) {
+			return $discard;
+		}
+		return $continue;
+	}
+
+	public function handleReceiverTransaction(InvMenuTransaction $action): InvMenuTransactionResult
+	{
+		$discard = $action->discard()->then(fn (Player $player) => $this->syncWith());
+		$continue = $action->continue()->then(fn (Player $player) => $this->syncWith());
+
+		$slot = $action->getAction()->getSlot();
+		if ($this->done) {
+			return $discard;
+		}
+
+		if ($slot === self::RECEIVER_DONE_SLOT) {
+			if ($this->isReceiverDone) {
+				if (!$this->isReceiverConfirmed && $this->isSenderDone) {
+					$this->isReceiverConfirmed = true;
+				}
 				return $discard;
 			}
+			$this->isReceiverDone = true;
+			return $discard;
+		}
+		if ($this->isReceiverDone || $this->isReceiverConfirmed) {
+			return $discard;
+		}
+
+		if (!in_array($slot, array_merge(self::RECEIVER_SLOTS, [self::RECEIVER_DONE_SLOT]))) {
+			return $discard;
 		}
 		return $continue;
 	}
@@ -304,5 +335,7 @@ final class TradeQueue
 		if (!$this->done && $this->isSenderConfirmed && $this->isReceiverConfirmed) {
 			$this->done();
 		}
+		$this->isSenderSynced = true;
+		$this->isReceiverSynced = true;
 	}
 }
