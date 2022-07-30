@@ -6,7 +6,7 @@ projects:
   PlayerTrade:
     path: ""
     libs:
-      - src: muqsit/InvMenu/InvMenu
-        branch: master
+      - src: Muqsit/InvMenu/InvMenu
+        branch: "4.0"
         version: ^4.4.0
 ...
