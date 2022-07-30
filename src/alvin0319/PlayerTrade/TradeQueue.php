@@ -107,7 +107,9 @@ final class TradeQueue
 	public function done(): void
 	{
 		$this->done = true;
+
 		$this->removeFrom();
+		$this->syncWith();
 
 		$plugin = PlayerTrade::getInstance();
 		$senderRemains = [];
@@ -146,7 +148,9 @@ final class TradeQueue
 	public function cancel(bool $offline = true, bool $causedBySender = false): void
 	{
 		$this->done = true;
+
 		$this->removeFrom();
+		$this->syncWith();
 
 		$plugin = PlayerTrade::getInstance();
 		foreach (self::SENDER_SLOTS as $slot) {

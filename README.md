@@ -9,6 +9,7 @@ A PocketMine-MP plugin that implements trade like PC server!
 - Added a double confirmation system
 - Fixed item duplication on complete (Plugins-PocketMineMP/PlayerTrade#2 & Plugins-PocketMineMP/PlayerTrade#3)
 - Fixed rare occurrence of items not taken away from sender on complete
+- Fixed duplication on close due to mismatched inventory
 
 # Features
 * User-modifiable message
