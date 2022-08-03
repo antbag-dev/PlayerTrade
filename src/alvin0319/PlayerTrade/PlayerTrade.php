@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace alvin0319\PlayerTrade;
 
-use pocketmine\event\Listener;
 use pocketmine\plugin\PluginBase;
 use muqsit\invmenu\InvMenuHandler;
 use pocketmine\utils\SingletonTrait;
@@ -13,7 +12,7 @@ use alvin0319\PlayerTrade\trade\TradeManager;
 use alvin0319\PlayerTrade\command\TradeCommand;
 use alvin0319\PlayerTrade\task\TradeRequestTask;
 
-final class PlayerTrade extends PluginBase implements Listener
+final class PlayerTrade extends PluginBase
 {
 	use SingletonTrait;
 
@@ -34,7 +33,6 @@ final class PlayerTrade extends PluginBase implements Listener
 			InvMenuHandler::register($this);
 		}
 
-		$this->getServer()->getPluginManager()->registerEvents(new EventListener(), $this);
 		$this->getScheduler()->scheduleRepeatingTask(new TradeRequestTask(), 20);
 		$this->getServer()->getCommandMap()->register("playertrade", new TradeCommand());
 		$this->saveDefaultConfig();
