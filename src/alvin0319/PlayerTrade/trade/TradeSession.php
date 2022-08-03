@@ -2,21 +2,23 @@
 
 declare(strict_types=1);
 
-namespace alvin0319\PlayerTrade;
+namespace alvin0319\PlayerTrade\trade;
 
 use Closure;
+use pocketmine\Server;
 use muqsit\invmenu\InvMenu;
 use pocketmine\item\ItemIds;
 use pocketmine\player\Player;
 use pocketmine\item\ItemFactory;
 use pocketmine\scheduler\TaskHandler;
+use alvin0319\PlayerTrade\PlayerTrade;
 use alvin0319\PlayerTrade\event\TradeEndEvent;
 use alvin0319\PlayerTrade\event\TradeStartEvent;
+use alvin0319\PlayerTrade\task\TradeSessionTask;
 use muqsit\invmenu\transaction\InvMenuTransaction;
-use alvin0319\PlayerTrade\task\TradeQueueCheckTask;
 use muqsit\invmenu\transaction\InvMenuTransactionResult;
 
-final class TradeQueue
+final class TradeSession
 {
 	public const SENDER_SLOTS = [
 		0, 1, 2, 3, 9, 10, 11, 12, 18, 19, 20, 21, 27, 28, 29, 30, 36, 37, 38, 39, 46, 47, 48
@@ -46,21 +48,21 @@ final class TradeQueue
 		protected Player $sender,
 		protected Player $receiver
 	) {
-		$this->senderMenu = InvMenu::create(InvMenu::TYPE_DOUBLE_CHEST);
-		$this->senderMenu->setName("You      |     {$receiver->getName()}");
-		$this->senderMenu->setListener(Closure::fromCallable([$this, "handleInventoryTransaction"]));
-		$this->senderMenu->setInventoryCloseListener(Closure::fromCallable([$this, "onInventoryClose"]));
+		$this->senderMenu = InvMenu::create(InvMenu::TYPE_DOUBLE_CHEST)
+			->setName("You      |     {$receiver->getName()}")
+			->setListener(Closure::fromCallable([$this, "handleInventoryTransaction"]))
+			->setInventoryCloseListener(Closure::fromCallable([$this, "onInventoryClose"]));
 
-		$this->receiverMenu = InvMenu::create(InvMenu::TYPE_DOUBLE_CHEST);
-		$this->receiverMenu->setName("{$sender->getName()}   |     You");
-		$this->receiverMenu->setListener(Closure::fromCallable([$this, "handleInventoryTransaction"]));
-		$this->receiverMenu->setInventoryCloseListener(Closure::fromCallable([$this, "onInventoryClose"]));
+		$this->receiverMenu = InvMenu::create(InvMenu::TYPE_DOUBLE_CHEST)
+			->setName("{$sender->getName()}   |     You")
+			->setListener(Closure::fromCallable([$this, "handleInventoryTransaction"]))
+			->setInventoryCloseListener(Closure::fromCallable([$this, "onInventoryClose"]));
 
-		$borderItem = ItemFactory::getInstance()->get(20, 0, 1);
-		$borderItem->setCustomName("§l ");
+		$borderItem = ItemFactory::getInstance()->get(20, 0, 1)
+			->setCustomName("§l ");
+		$redItem = ItemFactory::getInstance()->get(ItemIds::TERRACOTTA, 14)
+			->setCustomName("§r§c§lWAIT!");
 
-		$redItem = ItemFactory::getInstance()->get(ItemIds::TERRACOTTA, 14);
-		$redItem->setCustomName("§r§c§lWAIT!");
 		foreach (self::BORDER_SLOTS as $slot) {
 			$this->senderMenu->getInventory()->setItem($slot, $borderItem);
 			$this->receiverMenu->getInventory()->setItem($slot, $borderItem);
@@ -68,7 +70,6 @@ final class TradeQueue
 
 		$this->senderMenu->getInventory()->setItem(self::SENDER_DONE_SLOT, $redItem);
 		$this->senderMenu->getInventory()->setItem(self::RECEIVER_DONE_SLOT, $redItem);
-
 		$this->receiverMenu->getInventory()->setItem(self::SENDER_DONE_SLOT, $redItem);
 		$this->receiverMenu->getInventory()->setItem(self::RECEIVER_DONE_SLOT, $redItem);
 
@@ -77,21 +78,44 @@ final class TradeQueue
 
 	public function startTrade(): void
 	{
+		$ev = new TradeStartEvent($this->sender, $this->receiver);
+		$ev->call();
 		if (!$this->sender->isOnline() || !$this->receiver->isOnline()) {
+			$ev->cancel();
 			return;
 		}
 
-		$ev = new TradeStartEvent($this->sender, $this->receiver);
-		$ev->call();
 		if ($ev->isCancelled()) {
 			$this->removeFrom();
 			return;
 		}
-
 		$this->senderMenu->send($this->sender);
 		$this->receiverMenu->send($this->receiver);
 
-		$this->handler = PlayerTrade::getInstance()->getScheduler()->scheduleRepeatingTask(new TradeQueueCheckTask($this), 20);
+		$this->handler = PlayerTrade::getInstance()->getScheduler()->scheduleRepeatingTask(new TradeSessionTask($this), 20);
+	}
+
+	public function removeFrom(): void
+	{
+		TradeManager::removeTradeSession($this);
+		if ($this->handler !== null) {
+			$this->handler->cancel();
+		}
+	}
+
+	public function isReceiver(Player $player): bool
+	{
+		return $this->receiver->getName() === $player->getName();
+	}
+
+	public function isSender(Player $player): bool
+	{
+		return $this->sender->getName() === $player->getName();
+	}
+
+	public function isDone(): bool
+	{
+		return $this->done;
 	}
 
 	public function getSender(): Player
@@ -104,16 +128,17 @@ final class TradeQueue
 		return $this->receiver;
 	}
 
-	public function done(): void
+	public function success(): void
 	{
 		$this->done = true;
 
 		$this->removeFrom();
-		$this->syncWith();
+		$this->syncSlots();
 
 		$plugin = PlayerTrade::getInstance();
 		$senderRemains = [];
 		$receiverRemains = [];
+
 		foreach (self::RECEIVER_SLOTS as $slot) {
 			$item = $this->receiverMenu->getInventory()->getItem($slot);
 			if (!$item->isNull()) {
@@ -126,6 +151,7 @@ final class TradeQueue
 				$receiverRemains = array_merge($receiverRemains, $this->receiver->getInventory()->addItem($item));
 			}
 		}
+
 		if (count($senderRemains) > 0) {
 			$this->sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("trade.inventoryFull"));
 			foreach ($senderRemains as $remain) {
@@ -138,10 +164,13 @@ final class TradeQueue
 				$this->receiver->dropItem($remain);
 			}
 		}
+
 		$this->sender->removeCurrentWindow();
 		$this->receiver->removeCurrentWindow();
+
 		$this->sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("trade.success"));
 		$this->receiver->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("trade.success"));
+
 		(new TradeEndEvent($this->sender, $this->receiver, TradeEndEvent::REASON_SUCCESS))->call();
 	}
 
@@ -150,7 +179,7 @@ final class TradeQueue
 		$this->done = true;
 
 		$this->removeFrom();
-		$this->syncWith();
+		$this->syncSlots();
 
 		$plugin = PlayerTrade::getInstance();
 		foreach (self::SENDER_SLOTS as $slot) {
@@ -168,10 +197,10 @@ final class TradeQueue
 
 		if ($offline) {
 			if ($causedBySender) {
-				$this->receiverMenu->onClose($this->receiver);
+				$this->onClose($this->receiverMenu, $this->receiver);
 				$this->receiver->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("trade.cancel.senderLeft"));
 			} else {
-				$this->senderMenu->onClose($this->sender);
+				$this->onClose($this->senderMenu, $this->sender);
 				$this->sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("trade.cancel.receiverLeft"));
 			}
 		} else {
@@ -181,23 +210,15 @@ final class TradeQueue
 			]);
 
 			if ($this->sender->isConnected()) {
-				$this->senderMenu->onClose($this->sender);
+				$this->onClose($this->senderMenu, $this->sender);
 				$this->sender->sendMessage(PlayerTrade::$prefix . $message);
 			}
 			if ($this->receiver->isConnected()) {
-				$this->receiverMenu->onClose($this->receiver);
+				$this->onClose($this->receiverMenu, $this->receiver);
 				$this->receiver->sendMessage(PlayerTrade::$prefix . $message);
 			}
 		}
 		(new TradeEndEvent($this->sender, $this->receiver, $causedBySender ? ($offline ? TradeEndEvent::REASON_SENDER_QUIT : TradeEndEvent::REASON_RECEIVER_QUIT) : TradeEndEvent::REASON_RECEIVER_CANCEL));
-	}
-
-	public function removeFrom(): void
-	{
-		PlayerTrade::getInstance()->removeFromQueue($this);
-		if ($this->handler !== null) {
-			$this->handler->cancel();
-		}
 	}
 
 	public function handleInventoryTransaction(InvMenuTransaction $action): InvMenuTransactionResult
@@ -210,14 +231,14 @@ final class TradeQueue
 			$this->isReceiverSynced = false;
 			return $this->handleReceiverTransaction($action);
 		} else {
-			return $action->discard()->then(fn (Player $player) => $this->syncWith());
+			return $action->discard()->then(fn (Player $player) => $this->syncSlots());
 		}
 	}
 
-	public function handleSenderTransaction(InvMenuTransaction $action): InvMenuTransactionResult
+	private function handleSenderTransaction(InvMenuTransaction $action): InvMenuTransactionResult
 	{
-		$discard = $action->discard()->then(fn (Player $player) => $this->syncWith());
-		$continue = $action->continue()->then(fn (Player $player) => $this->syncWith());
+		$discard = $action->discard()->then(fn (Player $player) => $this->syncSlots());
+		$continue = $action->continue()->then(fn (Player $player) => $this->syncSlots());
 
 		$slot = $action->getAction()->getSlot();
 		if ($this->done) {
@@ -244,10 +265,10 @@ final class TradeQueue
 		return $continue;
 	}
 
-	public function handleReceiverTransaction(InvMenuTransaction $action): InvMenuTransactionResult
+	private function handleReceiverTransaction(InvMenuTransaction $action): InvMenuTransactionResult
 	{
-		$discard = $action->discard()->then(fn (Player $player) => $this->syncWith());
-		$continue = $action->continue()->then(fn (Player $player) => $this->syncWith());
+		$discard = $action->discard()->then(fn (Player $player) => $this->syncSlots());
+		$continue = $action->continue()->then(fn (Player $player) => $this->syncSlots());
 
 		$slot = $action->getAction()->getSlot();
 		if ($this->done) {
@@ -281,28 +302,13 @@ final class TradeQueue
 		}
 	}
 
-	public function isReceiver(Player $player): bool
+	public function syncSlots(): void
 	{
-		return $this->receiver->getName() === $player->getName();
-	}
+		$yellowItem = ItemFactory::getInstance()->get(ItemIds::TERRACOTTA, 4)
+			->setCustomName("§r§l§aREADY!");
+		$greenItem = ItemFactory::getInstance()->get(ItemIds::TERRACOTTA, 13)
+			->setCustomName("§r§l§aCONFIRMED!");
 
-	public function isSender(Player $player): bool
-	{
-		return $this->sender->getName() === $player->getName();
-	}
-
-	public function isDone(): bool
-	{
-		return $this->done;
-	}
-
-	public function syncWith(): void
-	{
-		$yellowItem = ItemFactory::getInstance()->get(ItemIds::TERRACOTTA, 4);
-		$yellowItem->setCustomName("§r§l§aREADY!");
-
-		$greenItem = ItemFactory::getInstance()->get(ItemIds::TERRACOTTA, 13);
-		$greenItem->setCustomName("§r§l§aCONFIRMED!");
 		foreach (self::SENDER_SLOTS as $slot) {
 			$senderItem = $this->senderMenu->getInventory()->getItem($slot);
 			$receiverItem = $this->receiverMenu->getInventory()->getItem($slot);
@@ -326,7 +332,6 @@ final class TradeQueue
 			$this->senderMenu->getInventory()->setItem(self::RECEIVER_DONE_SLOT, $yellowItem);
 			$this->receiverMenu->getInventory()->setItem(self::RECEIVER_DONE_SLOT, $yellowItem);
 		}
-
 		if ($this->isSenderConfirmed) {
 			$this->senderMenu->getInventory()->setItem(self::SENDER_DONE_SLOT, $greenItem);
 			$this->receiverMenu->getInventory()->setItem(self::SENDER_DONE_SLOT, $greenItem);
@@ -337,9 +342,17 @@ final class TradeQueue
 		}
 
 		if (!$this->done && $this->isSenderConfirmed && $this->isReceiverConfirmed) {
-			$this->done();
+			$this->success();
 		}
 		$this->isSenderSynced = true;
 		$this->isReceiverSynced = true;
+	}
+
+	private function onClose(InvMenu $invMenu, Player $player): void
+	{
+		// Fixes a crash in InvMenu when attempting to close menu while task scheduler is disabled during shutdown
+		if (Server::getInstance()->isRunning()) {
+			$invMenu->onClose($player);
+		}
 	}
 }

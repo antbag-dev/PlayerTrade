@@ -8,6 +8,7 @@ use pocketmine\player\Player;
 use pocketmine\command\Command;
 use pocketmine\command\CommandSender;
 use alvin0319\PlayerTrade\PlayerTrade;
+use alvin0319\PlayerTrade\trade\TradeManager;
 use pocketmine\command\utils\InvalidCommandSyntaxException;
 
 final class TradeCommand extends Command
@@ -23,33 +24,34 @@ final class TradeCommand extends Command
 		if (!$this->testPermission($sender)) {
 			return false;
 		}
+		if (count($args) < 2) {
+			throw new InvalidCommandSyntaxException();
+		}
+
 		$plugin = PlayerTrade::getInstance();
 		if (!$sender instanceof Player) {
 			$sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("command.ingameOnly"));
 			return false;
 		}
-		if (count($args) < 2) {
-			throw new InvalidCommandSyntaxException();
+
+		$player = $sender->getServer()->getPlayerByPrefix($args[1]);
+		if (!$player instanceof Player) {
+			$sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("command.offlinePlayer"));
+			return false;
 		}
-		switch (array_shift($args)) {
+
+		if ($sender->getName() === $player->getName()) {
+			$sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("command.noSelf"));
+			return false;
+		}
+
+		switch ($args[0]) {
 			case "request":
-				if (PlayerTrade::getInstance()->hasRequest($sender)) {
+				if (!TradeManager::addRequest($sender, $player)) {
 					$sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("command.alreadyHaveRequest"));
 					return false;
 				}
-				/** @phpstan-ignore-next-line */
-				$player = $sender->getServer()->getPlayerByPrefix(array_shift($args));
-				if (!$player instanceof Player) {
-					$sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("command.offlinePlayer"));
-					return false;
-				}
-				if ($player->getName() === $sender->getName()) {
-					$sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("command.noSelf", [
-						"request trade"
-					]));
-					return false;
-				}
-				PlayerTrade::getInstance()->addRequest($sender, $player);
+
 				$sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("command.requestSuccess", [
 					$player->getName()
 				]));
@@ -61,46 +63,21 @@ final class TradeCommand extends Command
 				]));
 				break;
 			case "accept":
-				/** @phpstan-ignore-next-line */
-				$player = $sender->getServer()->getPlayerByPrefix(array_shift($args));
-				if (!$player instanceof Player) {
-					$sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("command.offlinePlayer"));
-					return false;
-				}
-				if ($sender->getName() === $player->getName()) {
-					$sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("command.noSelf", [
-						"accept request"
-					]));
-					return false;
-				}
-				if (!PlayerTrade::getInstance()->hasRequestFrom($sender, $player)) {
+				if (!TradeManager::acceptRequest($player, $sender)) {
 					$sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("command.noAnyRequest", [
 						$player->getName()
 					]));
 					return false;
 				}
-				PlayerTrade::getInstance()->acceptRequest($sender);
 				break;
 			case "deny":
-				/** @phpstan-ignore-next-line */
-				$player = $sender->getServer()->getPlayerByPrefix(array_shift($args));
-				if (!$player instanceof Player) {
-					$sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("command.offlinePlayer"));
-					return false;
-				}
-				if ($sender->getName() === $player->getName()) {
-					$sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("command.noSelf", [
-						"deny request"
-					]));
-					return false;
-				}
-				if (!PlayerTrade::getInstance()->hasRequestFrom($sender, $player)) {
+				if (!TradeManager::denyRequest($player, $sender)) {
 					$sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("command.noAnyRequest", [
 						$player->getName()
 					]));
 					return false;
 				}
-				PlayerTrade::getInstance()->denyRequest($sender);
+				
 				$sender->sendMessage(PlayerTrade::$prefix . $plugin->getLanguage()->translateString("command.requestDeny", [
 					$player->getName()
 				]));

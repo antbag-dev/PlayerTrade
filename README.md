@@ -10,6 +10,7 @@ A PocketMine-MP plugin that implements trade like PC server!
 - Fixed item duplication on complete (Plugins-PocketMineMP/PlayerTrade#2 & Plugins-PocketMineMP/PlayerTrade#3)
 - Fixed rare occurrence of items not taken away from sender on complete
 - Fixed duplication on close due to mismatched inventory
+- Fixed synchronization problems causing inconsistency
 
 # Features
 * User-modifiable message
