@@ -1,10 +1,13 @@
 {
-    "name": "magicgames-network/playertrade",
-    "type": "library",
-    "description": "",
-    "require-dev": {
-      "pocketmine/pocketmine-mp": "4.*",
-      "phpstan/phpstan": "^1.8.2",
-      "dzolnowski/invmenu": "4.0.x-dev"
-    }
+  "name": "magicgames-network/playertrade",
+  "type": "library",
+  "description": "",
+  "require-dev": {
+    "pocketmine/pocketmine-mp": "dev-next-major",
+    "pocketmine/bedrock-block-upgrade-schema": "dev-master",
+    "pocketmine/bedrock-item-upgrade-schema": "dev-master",
+    "pocketmine/bedrock-data": "dev-modern-world-support",
+    "phpstan/phpstan": "^1.8.2",
+    "dzolnowski/invmenu": "4.0.x-dev"
   }
+}
